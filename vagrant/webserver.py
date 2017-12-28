@@ -24,7 +24,7 @@ class webserverHandler(BaseHTTPRequestHandler):
                 output += "<a href='/restaurants/new'>Create New Restaurant</a><br>"
                 for restaurant in restaurants:
                     output += "<h1>" + restaurant.name + "</h1>"
-                    output += "<a href='#'>Edit</a><br>"
+                    output += "<a href='/restaurants/%s/edit'>Edit</a><br>" % restaurant.id
                     output += "<a href='#'>Delete</a><br>"
 
                 output += "</body></html>"
@@ -47,19 +47,41 @@ class webserverHandler(BaseHTTPRequestHandler):
                 print output
                 return
 
+            if self.path.endswith("/edit"):
+                self.send_response(200)
+                self.send_header('Content-type', 'text/html')
+                self.end_headers()
+
+                restaurantId = self.path.split('/')[-2]
+                restaurant = session.query(Restaurant).filter_by(id = restaurantId).one()
+
+                output = ""
+                output += "<html><body>"
+                output += "<h1>Edit Restaurant Name</h1>"
+                output += "<form method='POST' enctype='multipart/form-data' action='/restaurants/%s/edit'>" % restaurantId
+                output += "<input name='editedRestaurantName' type='text' placeholder='" + restaurant.name + "'>"
+                output += "<input type='submit' value='Edit'> </form>"
+                output += "</body></html>"
+                self.wfile.write(output)
+                print output
+                return
+
         except IOError:
             self.send_error(404, "File Not Found %s" % self.path)
 
     def do_POST(self):
         try:
-            if self.path.endswith("/restaurants/new"):
+            if self.path.endswith("/edit"):
                 ctype, pdict = cgi.parse_header(self.headers.getheader('content-type'))
                 if ctype == 'multipart/form-data':
                     fields = cgi.parse_multipart(self.rfile, pdict)
-                    messagecontent = fields.get('newRestaurantName')
+                    messagecontent = fields.get('editedRestaurantName')
 
-                    newRestaurant = Restaurant(name=messagecontent[0])
-                    session.add(newRestaurant)
+                    restaurantId = self.path.split('/')[-2]
+                    restaurant = session.query(Restaurant).filter_by(id = restaurantId).one()
+                    restaurant.name = messagecontent[0]
+
+                    session.add(restaurant)
                     session.commit()
 
                     self.send_response(301)
